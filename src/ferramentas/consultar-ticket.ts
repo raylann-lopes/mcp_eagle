@@ -205,6 +205,11 @@ function formatarUrgencia(urgencia: string): string {
  */
 function limparHtmlParaTexto(html: string): string {
     return html
+        // 1. Converter tags de imagem para Markdown: ![alt](url)
+        .replace(/<img[^>]*src=["']([^"']+)["'][^>]*alt=["']([^"']*)["'][^>]*>/gi, "![img - $2]($1)")
+        .replace(/<img[^>]*alt=["']([^"']*)["'][^>]*src=["']([^"']+)["'][^>]*>/gi, "![img - $1]($2)")
+        .replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, "![img]($1)")
+        // 2. Outras conversões...
         .replace(/<br\s*\/?>/gi, "\n")    // Converter <br> em quebra de linha
         .replace(/<\/p>/gi, "\n")          // Converter </p> em quebra de linha
         .replace(/<\/li>/gi, "\n")         // Converter </li> em quebra de linha

@@ -271,6 +271,11 @@ function formatarResultadosBusca(
  */
 function limparHtmlParaTextoBasico(html: string): string {
     return html
+        // 1. Converter tags de imagem para Markdown: ![alt](url)
+        .replace(/<img[^>]*src=["']([^"']+)["'][^>]*alt=["']([^"']*)["'][^>]*>/gi, "![img - $2]($1)")
+        .replace(/<img[^>]*alt=["']([^"']*)["'][^>]*src=["']([^"']+)["'][^>]*>/gi, "![img - $1]($2)")
+        .replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, "![img]($1)")
+        // 2. Outras conversões...
         .replace(/<br\s*\/?>/gi, "\n")
         .replace(/<\/p>/gi, "\n")
         .replace(/<\/li>/gi, "\n")
