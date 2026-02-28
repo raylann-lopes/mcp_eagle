@@ -25,4 +25,4 @@ services:
 
 networks:
   suporte-net:
-    driver: bridge
+    driver: overlay
