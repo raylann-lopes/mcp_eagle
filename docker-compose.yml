@@ -1,16 +1,11 @@
 services:
   mcp-movidesk:
-    # Substitua pelo nome da sua imagem caso construa manualmente, 
-    # ou mantenha se for usar o build local
-    image: mcp-movidesk-eagle:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/raylann-lopes/mcp-movidesk-eagle:latest
     environment:
       - MOVIDESK_TOKEN=${MOVIDESK_TOKEN}
       - MCP_PORT=3000
     networks:
-      - wize-suporte-net
+      - wize-net
     deploy:
       replicas: 1
       restart_policy:
@@ -24,5 +19,5 @@ services:
         - "traefik.http.services.mcp.loadbalancer.server.port=3000"
 
 networks:
-  wize-suporte-net:
-    driver: overlay
+  wize-net:
+    external: true
