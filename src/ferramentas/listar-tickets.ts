@@ -68,8 +68,8 @@ export async function executarListarTickets(
         const filtros: string[] = [];
 
         if (parametros.nomeCliente) {
-            // Buscar por nome no campo clients (busca parcial com contains)
-            filtros.push(`clients/any(c: contains(c/businessName, '${parametros.nomeCliente}'))`);
+            // Buscar por nome no campo clients (busca parcial com contains, ignorando case)
+            filtros.push(`clients/any(c: contains(tolower(c/businessName), tolower('${parametros.nomeCliente}')))`);
         }
 
         if (parametros.emailCliente) {

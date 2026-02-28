@@ -327,7 +327,7 @@ export class ClienteMovidesk {
             "/persons",
             undefined,
             {
-                $filter: `contains(businessName, '${nome}')`,
+                $filter: `contains(tolower(businessName), tolower('${nome}'))`,
                 $top: "10",
             }
         );
