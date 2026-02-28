@@ -3,7 +3,9 @@ services:
     # Substitua pelo nome da sua imagem caso construa manualmente, 
     # ou mantenha se for usar o build local
     image: mcp-movidesk-eagle:latest
-
+    build:
+      context: .
+      dockerfile: Dockerfile
     environment:
       - MOVIDESK_TOKEN=${MOVIDESK_TOKEN}
       - MCP_PORT=3000
