@@ -27,6 +27,7 @@ import { schemaAdicionarInteracao, executarAdicionarInteracao } from "./ferramen
 import { schemaListarTickets, executarListarTickets } from "./ferramentas/listar-tickets.js";
 import { schemaAlterarStatus, executarAlterarStatus } from "./ferramentas/alterar-status.js";
 import { schemaAtribuirAgente, executarAtribuirAgente } from "./ferramentas/atribuir-agente.js";
+import { schemaConsultarCliente, executarConsultarCliente } from "./ferramentas/consultar-cliente.js";
 
 // ============================================================
 // FUNÇÃO PRINCIPAL — Criar e configurar o servidor MCP
@@ -130,6 +131,21 @@ export function criarServidorMcp(token: string): McpServer {
         schemaListarTickets.shape,
         async (parametros) => {
             const resultado = await executarListarTickets(parametros, clienteApi);
+            return {
+                content: [{ type: "text" as const, text: resultado }],
+            };
+        }
+    );
+
+    // —— 5.5. CONSULTAR CLIENTE ——
+    servidor.tool(
+        "consultar_cliente",
+        "Busca e consulta se um cliente existe na base de contatos do sistema (" +
+        "Pessoas/Empresas), buscando pelo Nome (Razão social), Email ou CPF/CNPJ. " +
+        "Sempre use essa função se o usuário solicitar para checar um cliente, antes de abrir tickets.",
+        schemaConsultarCliente.shape,
+        async (parametros) => {
+            const resultado = await executarConsultarCliente(parametros, clienteApi);
             return {
                 content: [{ type: "text" as const, text: resultado }],
             };
