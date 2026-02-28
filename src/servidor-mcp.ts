@@ -60,8 +60,9 @@ export function criarServidorMcp(token: string): McpServer {
         "Cria um novo ticket no Movidesk com macro de suporte formatada em HTML. " +
         "Ideal para registrar atendimentos após o suporte. " +
         "Suporta macros de atendimento e escalonamento. " +
-        "Ao criar um ticket, SEMPRE formate o conteúdo em HTML profissional. " +
-        "A macro de atendimento segue o formato: Descrição, Versão do(s) banco(s), Solução.",
+        "SEMPRE use a ferramenta 'consultar_cliente' ANTES para pegar o email ou id do cliente (" +
+        "você NÃO PODE tentar adivinhar ou embutir um CPF/CNPJ ou Nome, a api apenas " +
+        "suportará dados reais vindos da consulta do cliente no movidesk)",
         schemaCriarTicket.shape,
         async (parametros) => {
             // Executar a criação do ticket com os parâmetros validados pelo Zod
@@ -111,8 +112,7 @@ export function criarServidorMcp(token: string): McpServer {
         "Adiciona uma interação (comentário/ação) em um ticket existente do Movidesk. " +
         "O conteúdo é automaticamente formatado em HTML. " +
         "IMPORTANTE: Pergunte ao usuário o número do ticket. " +
-        "Se não souber, pergunte o nome do cliente para buscar o ticket. " +
-        "Ao encontrar, confirme o título do ticket antes de inserir a ação.",
+        "Se o usuário mencionar o nome do cliente, utilize primeiro a ferramenta 'consultar_cliente' e 'listar_tickets_cliente' para achar o ID Exato do ticket.",
         schemaAdicionarInteracao.shape,
         async (parametros) => {
             const resultado = await executarAdicionarInteracao(parametros, clienteApi);
