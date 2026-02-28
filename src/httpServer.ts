@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import express, { Request, Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { criarServidorMcp } from "./servidor-mcp.js";
@@ -34,23 +35,34 @@ async function main(): Promise<void> {
     const app = createMcpExpressApp({ host: "0.0.0.0" });
 
     // Mapa de transportes por session ID
-    const transports: Record<string, StreamableHTTPServerTransport> = {};
+    const transports: Record<string, any> = {};
 
-    // ── POST /mcp ────────────────────────────────────────────────────────────
+    // =========================================================================
+    // NOVO PROTOCOLO (Streamable HTTP)
+    // =========================================================================
+    
     app.post("/mcp", async (req: Request, res: Response) => {
         try {
             const sessionId = req.headers["mcp-session-id"] as string | undefined;
             let transport: StreamableHTTPServerTransport;
 
             if (sessionId && transports[sessionId]) {
-                // Sessão existente
-                transport = transports[sessionId];
+                const existingTransport = transports[sessionId];
+                if (existingTransport instanceof StreamableHTTPServerTransport) {
+                    transport = existingTransport;
+                } else {
+                    res.status(400).json({
+                        jsonrpc: "2.0",
+                        error: { code: -32000, message: "Transport mismatch" },
+                        id: null,
+                    });
+                    return;
+                }
             } else if (!sessionId && isInitializeRequest(req.body)) {
                 // Nova inicialização
                 transport = new StreamableHTTPServerTransport({
                     sessionIdGenerator: () => randomUUID(),
                     onsessioninitialized: (sid: string) => {
-                        console.log(`✅ Sessão iniciada: ${sid}`);
                         transports[sid] = transport;
                     },
                 });
@@ -58,12 +70,10 @@ async function main(): Promise<void> {
                 transport.onclose = () => {
                     const sid = transport.sessionId;
                     if (sid && transports[sid]) {
-                        console.log(`🔌 Sessão encerrada: ${sid}`);
                         delete transports[sid];
                     }
                 };
 
-                // Instancia o nosso servidor MCP do Mcp_Eagle passando o token
                 const server = criarServidorMcp(process.env.MOVIDESK_TOKEN!);
                 await server.connect(transport);
                 await transport.handleRequest(req, res, req.body);
@@ -71,10 +81,7 @@ async function main(): Promise<void> {
             } else {
                 res.status(400).json({
                     jsonrpc: "2.0",
-                    error: {
-                        code: -32000,
-                        message: "Bad Request: sessão inválida ou requisição não é de inicialização.",
-                    },
+                    error: { code: -32000, message: "Bad Request" },
                     id: null,
                 });
                 return;
@@ -93,7 +100,6 @@ async function main(): Promise<void> {
         }
     });
 
-    // ── GET /mcp (SSE stream) ────────────────────────────────────────────────
     app.get("/mcp", async (req: Request, res: Response) => {
         const sessionId = req.headers["mcp-session-id"] as string | undefined;
         if (!sessionId || !transports[sessionId]) {
@@ -103,7 +109,6 @@ async function main(): Promise<void> {
         await transports[sessionId].handleRequest(req, res);
     });
 
-    // ── DELETE /mcp (encerrar sessão) ────────────────────────────────────────
     app.delete("/mcp", async (req: Request, res: Response) => {
         const sessionId = req.headers["mcp-session-id"] as string | undefined;
         if (!sessionId || !transports[sessionId]) {
@@ -113,10 +118,39 @@ async function main(): Promise<void> {
         try {
             await transports[sessionId].handleRequest(req, res);
         } catch (error) {
-            console.error("❌ Erro no DELETE /mcp:", error);
-            if (!res.headersSent) {
-                res.status(500).send("Erro ao encerrar sessão");
-            }
+            if (!res.headersSent) res.status(500).send("Erro ao encerrar sessão");
+        }
+    });
+
+    // =========================================================================
+    // PROTOCOLO LEGADO (HTTP + SSE), usado pelo AnythingLLM 
+    // =========================================================================
+
+    app.get("/sse", async (req: Request, res: Response) => {
+        console.log("Recebido request GET em /sse (AnythingLLM)");
+        const transport = new SSEServerTransport("/messages", res);
+        transports[transport.sessionId] = transport;
+        
+        res.on("close", () => {
+             delete transports[transport.sessionId];
+        });
+
+        const server = criarServidorMcp(process.env.MOVIDESK_TOKEN!);
+        await server.connect(transport);
+    });
+
+    app.post("/messages", async (req: Request, res: Response) => {
+        const sessionId = req.query.sessionId as string;
+        if (!sessionId) {
+            res.status(400).send("Missing sessionId parameter");
+            return;
+        }
+
+        const existingTransport = transports[sessionId];
+        if (existingTransport instanceof SSEServerTransport) {
+            await existingTransport.handlePostMessage(req, res, req.body);
+        } else {
+            res.status(400).send("Session not found or wrong transport");
         }
     });
 
@@ -127,17 +161,19 @@ async function main(): Promise<void> {
 
     // ── Start ────────────────────────────────────────────────────────────────
     app.listen(PORT, "0.0.0.0", () => {
-        console.log(`🚀 Servidor MCP Movidesk (HTTP) rodando em http://0.0.0.0:${PORT}/mcp`);
+        console.log(`🚀 Servidor MCP Movidesk (HTTP) rodando em http://0.0.0.0:${PORT}`);
+        console.log(`👉 Endpoint novo (Streamable HTTP): /mcp`);
+        console.log(`👉 Endpoint legado (SSE AnythingLLM): /sse`);
     });
 
     // ── Graceful shutdown ────────────────────────────────────────────────────
     process.on("SIGINT", async () => {
         console.log("Encerrando servidor...");
         for (const sid in transports) {
-            try {
-                await transports[sid].close();
-                delete transports[sid];
-            } catch { /* ignore */ }
+             try {
+                 await transports[sid].close();
+                 delete transports[sid];
+             } catch { /* ignore */ }
         }
         process.exit(0);
     });
